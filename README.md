@@ -1,58 +1,64 @@
 # Qur'an Chat App 🌙
+*Bridging timeless scripture with modern intelligence.*
 
-An AI-powered iOS conversational application designed to provide grounded, contextually accurate answers and reflections based on the Holy Qur'an. Built as a rapid 3-day Minimum Viable Product (MVP) focusing on premium UI/UX, robust state management, and hallucination-resistant AI interactions.
-
-## 🚀 The Tech Stack
-* **Frontend:** React Native (Expo) & Expo Router
-* **Backend & Auth:** Supabase (PostgreSQL)
-* **Web Deployment:** Vercel
-* **State Management:** Zustand
-* **AI Provider:** Google Gemini API
+An AI-powered conversational iOS application engineered to provide deeply grounded, contextually accurate guidance based on the Holy Qur'an. Developed as a rapid 3-day Minimum Viable Product (MVP), this application prioritizes a hallucination-resistant data architecture, zero-latency state syncing, and a premium, natively fluid user interface.
 
 ---
 
-## 🧠 Structural Decisions & MVP Approach
-
-Given the strict 3-day time crunch, the architecture was heavily optimized for delivery speed without sacrificing the user experience or the integrity of the AI's responses.
-
-### 1. The AI Architecture: Lightweight RAG Pipeline
-When dealing with religious texts, AI hallucinations are unacceptable. Instead of relying solely on the LLM's pre-trained knowledge, I implemented a lightweight Retrieval-Augmented Generation (RAG) approach:
-* **Pre-fetch Context:** User prompts are first parsed to extract keywords and queried against a dedicated Qur'an API.
-* **Prompt Injection:** The retrieved, exact English translations and Arabic references are injected into the system prompt as immutable context.
-* **Grounded Generation:** Gemini is instructed to base its answers strictly on this injected context, effectively turning the LLM into a conversational synthesizer rather than a raw knowledge generator. 
-
-### 2. State Management: Optimistic UI Syncing
-To make the chat feel instantly responsive, the app utilizes an optimistic UI pattern via **Zustand**:
-* User messages and local "loading" bubbles are instantly generated with local UUIDs and pushed to the global store.
-* Database synchronization to **Supabase** happens asynchronously in the background. If a network request fails, the local state gracefully handles the error without locking up the main thread.
-* **Session Handling:** The Zustand store is strictly wiped on user sign-out to prevent local state leakage between accounts on the same physical device.
-
-### 3. UI/UX: Glassmorphism & Fluidity
-A core requirement was making the app feel premium and native. 
-* Implemented `expo-blur` for frosted glass styling across cards and bottom sheets.
-* Built custom, spring-animated tab indicators that replicate native iOS physics.
-* Leveraged dynamic Arabic typography (`Amiri`) seamlessly alongside modern sans-serif fonts to maintain cultural authenticity while ensuring readability.
+## 🚀 The Tech Stack & Tooling
+* **Frontend:** React Native (Expo) & Expo Router for universal, file-based routing.
+* **Backend & Auth:** Supabase (PostgreSQL) for secure, scalable data storage and authentication.
+* **Web Deployment:** Vercel (orchestrating the universal React Native web build).
+* **State Management:** Zustand for lightweight, optimistic UI updates.
+* **AI Provider:** Google Gemini API.
+* **Typography:** Custom integrations of `Amiri` (Arabic) and `Fraunces`/`Inter` (English).
 
 ---
 
-## ✂️ MVP Trade-offs (What was cut)
+## 🧠 Architectural Deep Dive
 
-To hit the 3-day deadline, explicit scoping decisions were made:
-1. **Row Level Security (RLS):** RLS policies on the `conversations` and `messages` tables were temporarily bypassed to accelerate the prototype. Securing these routes by `user_id` would be the immediate first step for production.
-2. **Server-Sent Events (SSE):** The AI currently returns its payload in a single block. Implementing a streaming response (chunk-by-chunk) would reduce perceived latency but required too much custom networking overhead for this timeframe.
+Delivering an AI product centered around religious text requires absolute precision. The architecture was designed to mitigate the inherent risks of Large Language Models (LLMs) while maintaining a seamless user experience.
+
+### 1. Context-First Retrieval-Augmented Generation (RAG)
+To prevent the AI from generating hallucinatory or unverified religious advice, the system does not rely on the LLM's raw parametric memory. Instead, it utilizes a strict, lightweight RAG pipeline:
+* **Query Interception:** User prompts are intercepted and distilled into optimal search keywords.
+* **Deterministic Retrieval:** These keywords query a deterministic Qur'an API to retrieve exact, verified English translations and Arabic references.
+* **Prompt Injection & Grounding:** The retrieved text is injected into a strict system prompt. The LLM is forced to act as a synthesizer of this injected context rather than a raw knowledge generator, ensuring the output is always anchored to authentic scripture.
+
+### 2. Dual-Layer State Management & Optimistic UI
+In mobile chat interfaces, network latency is the enemy of user engagement. 
+* **The Illusion of Zero Latency:** Zustand manages a highly optimized local memory store. When a user sends a message, local UUIDs instantly populate the UI with the user's message and an animated "Seeking wisdom..." placeholder.
+* **Asynchronous Persistence:** Database synchronization to Supabase's `conversations` and `messages` tables happens entirely in the background. 
+* **State Isolation:** The Zustand memory tree is completely wiped upon `signOut`, strictly preventing local state leakage between sessions on the same physical device.
+
+### 3. UI/UX Philosophy
+The interface was crafted to evoke tranquility, respect, and modern sophistication:
+* **Glassmorphism & Depth:** Extensive use of `expo-blur` and dynamic `LinearGradient` overlays to create frosted glass effects and 3D bevels that mimic high-end iOS design languages.
+* **Fluid Physics:** Tab transitions and state toggles utilize custom spring animations tuned to native iOS tension and friction physics.
+* **Contextual Typographic Rhythm:** The UI dynamically shifts between high-impact English serif displays (`Fraunces`) and authentic, culturally resonant Arabic script (`Amiri`), dynamically greeting the user with context-aware verses based on their session state.
 
 ---
 
-## 🔭 Future Roadmap & Scaling
+## ✂️ MVP Scope & Intentional Trade-offs
 
-If given more time, the next iterations would focus heavily on backend data engineering and engagement:
-* **Vector Database Migration:** Replace the basic keyword-search API with an embedded semantic search. By generating embeddings for the entire Qur'an and storing them in Supabase using `pgvector`, the RAG pipeline would understand the *meaning* behind complex user queries rather than just matching words.
-* **Offline Caching:** Implement local persistence (e.g., SQLite or MMKV) for the user's conversation history and daily cached Ayahs, allowing the app to open instantly even in airplane mode.
-* **Push Notifications:** Set up local triggers for a "Daily Ayah" reflection to drive consistent user engagement.
+Engineering is about resource allocation. To deliver a polished MVP within 72 hours, the following boundaries were explicitly drawn:
+
+1. **Row Level Security (RLS) Deferral:** While Supabase Auth handles identity perfectly, Postgres RLS policies on the `conversations` and `messages` tables were left permissive to accelerate client-side development. Locking these down to `auth.uid() = user_id` is the immediate next step for production.
+2. **Synchronous AI Payloads:** The Gemini response is currently awaited and rendered as a single block. Implementing Server-Sent Events (SSE) for chunked streaming would drastically reduce Time-to-First-Token (TTFT), but required complex native networking bridges outside the MVP timeframe.
 
 ---
 
-## 🛠️ Local Setup
+## 🔭 Future Roadmap: Big Data & Scaling
+
+With more time, the application would transition from a lightweight prototype to a highly robust data product:
+
+* **Semantic Search via pgvector:** The current keyword-based retrieval is limited. The primary architectural upgrade would involve generating high-dimensional embeddings for every Ayah in the Qur'an and storing them in Supabase using the `pgvector` extension. This would transform the retrieval engine to understand the deep semantic meaning of user queries (e.g., finding verses about "grief" even if the word isn't explicitly in the text).
+* **Caching & Edge Delivery:** Implementing a local persistence layer (like MMKV or SQLite) to cache the daily Ayahs and historical conversations, allowing the application to render instantly offline.
+* **Personalized Insight Engine:** Securely aggregating anonymized query intents to build localized, daily push notifications that offer highly relevant, tailored reflections.
+
+---
+
+## 🛠️ Local Development Guide
 
 **1. Clone the repository**
 ```bash
