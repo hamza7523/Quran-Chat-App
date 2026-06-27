@@ -1,38 +1,41 @@
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useChatStore } from '../../store/useChatStore';
+import { fetchDailyAyah, DailyAyah } from '../../lib/quranApi';
 import { colors, typography, spacing, radius, shadow, gradients } from '../../lib/theme';
 import type { ChatMode } from '../../store/useChatStore';
 
+// ─── UPDATED TO USE YOUR CUSTOM PNGs ───
 const MODES: {
   key: ChatMode;
   title: string;
   subtitle: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  image: any;
   accentColor: string;
 }[] = [
   {
     key: 'ask',
     title: "Ask About the Qur'an",
     subtitle: 'Explore meaning, context & tafsir',
-    icon: 'book-outline',
+    image: require('../../assets/images/koran.png'),
     accentColor: colors.sage500,
   },
   {
     key: 'comfort',
     title: 'Find Comfort',
     subtitle: 'Verses for difficult moments',
-    icon: 'heart-outline',
+    image: require('../../assets/images/prayer.png'),
     accentColor: colors.gold,
   },
   {
     key: 'dua',
     title: "Make Du'a",
     subtitle: 'Guided personal supplication',
-    icon: 'hand-left-outline',
+    image: require('../../assets/images/islamic.png'),
     accentColor: colors.goldDeep,
   },
 ];
@@ -41,33 +44,18 @@ const MODES: {
 function CrescentStar({ size = 28, color = colors.gold }: { size?: number; color?: string }) {
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Crescent outer circle */}
       <View style={{
-        position: 'absolute',
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        borderWidth: size * 0.12,
-        borderColor: color,
+        position: 'absolute', width: size, height: size, borderRadius: size / 2,
+        borderWidth: size * 0.12, borderColor: color,
       }} />
-      {/* Inner circle to cut crescent */}
       <View style={{
-        position: 'absolute',
-        width: size * 0.72,
-        height: size * 0.72,
-        borderRadius: size * 0.36,
-        backgroundColor: colors.sage700,
-        top: size * 0.04,
-        left: size * 0.22,
+        position: 'absolute', width: size * 0.72, height: size * 0.72,
+        borderRadius: size * 0.36, backgroundColor: colors.sage700,
+        top: size * 0.04, left: size * 0.22,
       }} />
-      {/* Star */}
       <Text style={{
-        position: 'absolute',
-        top: size * 0.04,
-        right: size * 0.04,
-        fontSize: size * 0.28,
-        color,
-        lineHeight: size * 0.32,
+        position: 'absolute', top: size * 0.04, right: size * 0.04,
+        fontSize: size * 0.28, color, lineHeight: size * 0.32,
       }}>✦</Text>
     </View>
   );
@@ -77,7 +65,6 @@ function CrescentStar({ size = 28, color = colors.gold }: { size?: number; color
 function GeometricOrnament() {
   return (
     <View style={ornStyles.container} pointerEvents="none">
-      {/* Corner dots pattern */}
       {[...Array(5)].map((_, row) =>
         [...Array(8)].map((_, col) => (
           <View
@@ -96,18 +83,27 @@ function GeometricOrnament() {
 
 const ornStyles = StyleSheet.create({
   container: { ...StyleSheet.absoluteFillObject as any, overflow: 'hidden' },
-  dot: {
-    position: 'absolute',
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: colors.gold,
-  },
+  dot: { position: 'absolute', width: 3, height: 3, borderRadius: 1.5, backgroundColor: colors.gold },
 });
 
 export default function HomeScreen() {
   const router = useRouter();
   const createConversation = useChatStore((s) => s.createConversation);
+  
+  // Dynamic Welcome Logic
+  const conversations = useChatStore((s) => s.conversations);
+  const isNewUser = !conversations || conversations.length === 0;
+  const greetingText = isNewUser ? 'WELCOME' : 'WELCOME BACK';
+  
+  const [dailyAyah, setDailyAyah] = useState<DailyAyah | null>(null);
+  const [loadingAyah, setLoadingAyah] = useState(true);
+
+  useEffect(() => {
+    fetchDailyAyah()
+      .then(setDailyAyah)
+      .catch(console.error)
+      .finally(() => setLoadingAyah(false));
+  }, []);
 
   const handleMode = (mode: ChatMode) => {
     const id = createConversation(mode);
@@ -118,70 +114,81 @@ export default function HomeScreen() {
     <LinearGradient colors={['#E8F0E8', '#D4E8D4', '#ECF4EC']} style={styles.root}>
       <GeometricOrnament />
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header */}
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          
+          {/* Header - Fixed Typography & Arrangement */}
           <View style={styles.headerRow}>
-            <View>
-              <Text style={styles.welcomeLabel}>WELCOME BACK</Text>
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.welcomeLabel}>{greetingText}</Text>
               <Text style={styles.appTitle}>Quran Chat</Text>
             </View>
-            <Pressable style={styles.profileBtn}>
-              <Ionicons name="person-outline" size={20} color={colors.textPrimary} />
+            <Pressable style={styles.profileBtn} onPress={() => router.push('/profile')}>
+              {/* ─── ADDED MALE PROFILE ICON HERE ─── */}
+              {/* Note: If you ever want to swap this dynamically, you can require 'moslem-woman.png' here */}
+              <Image 
+                source={require('../../assets/images/arab-man.png')} 
+                style={styles.profileAvatar} 
+              />
             </Pressable>
           </View>
 
-          {/* Daily Ayah Hero */}
-          <LinearGradient
-            colors={[colors.sage700, colors.sage800, '#0A1E0C']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroCard}
-          >
-            {/* Decorative overlay dots */}
-            {[...Array(12)].map((_, i) => (
-              <View key={i} style={[styles.heroDot, {
-                top: `${15 + (i % 4) * 22}%` as any,
-                left: `${(i / 12) * 100}%` as any,
-                opacity: 0.06 + (i % 3) * 0.02,
-              }]} />
-            ))}
+          {/* Daily Ayah Hero - Added 3D Shadow Wrapper */}
+          <View style={styles.heroWrapper}>
+            <LinearGradient
+              colors={[colors.sage700, colors.sage800, '#0A1E0C']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.heroCardInner}
+            >
+              {[...Array(12)].map((_, i) => (
+                <View key={i} style={[styles.heroDot, {
+                  top: `${15 + (i % 4) * 22}%` as any, left: `${(i / 12) * 100}%` as any,
+                  opacity: 0.06 + (i % 3) * 0.02,
+                }]} />
+              ))}
 
-            <View style={styles.heroTopRow}>
-              <CrescentStar size={22} color={colors.goldMuted} />
-              <Text style={styles.heroEyebrow}>AYAH OF THE DAY</Text>
-              <View style={styles.todayPill}>
-                <Text style={styles.todayText}>Today</Text>
+              <View style={styles.heroTopRow}>
+                <CrescentStar size={22} color={colors.goldMuted} />
+                <Text style={styles.heroEyebrow}>AYAH OF THE DAY</Text>
+                <View style={styles.todayPill}>
+                  <Text style={styles.todayText}>Today</Text>
+                </View>
               </View>
-            </View>
 
-            <Text style={styles.heroArabic}>ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ</Text>
+              {loadingAyah ? (
+                 <ActivityIndicator color={colors.gold} style={{ marginVertical: spacing.xl }} />
+              ) : (
+                <>
+                  <Text style={styles.heroArabic}>
+                    {dailyAyah ? dailyAyah.arabicText : 'ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ'}
+                  </Text>
 
-            <View style={styles.heroDivider}>
-              <View style={styles.heroDividerLine} />
-              <Text style={styles.heroDividerStar}>✦</Text>
-              <View style={styles.heroDividerLine} />
-            </View>
+                  <View style={styles.heroDivider}>
+                    <View style={styles.heroDividerLine} />
+                    <Text style={styles.heroDividerStar}>✦</Text>
+                    <View style={styles.heroDividerLine} />
+                  </View>
 
-            <Text style={styles.heroTranslation}>
-              All praise is due to Allah, Lord of all the worlds — the Most Gracious, the Most Merciful, Master of the Day of Judgment.
-            </Text>
+                  <Text style={styles.heroTranslation}>
+                    {dailyAyah ? `"${dailyAyah.englishText}"` : 'All praise is due to Allah, Lord of all the worlds...'}
+                  </Text>
 
-            <View style={styles.heroFooter}>
-              <View style={styles.heroRef}>
-                <Text style={styles.heroRefText}>Al-Fatiha 1:2</Text>
-              </View>
-              <Pressable
-                style={({ pressed }) => [styles.reflectBtn, pressed && { opacity: 0.8 }]}
-                onPress={() => handleMode('ask')}
-              >
-                <Text style={styles.reflectText}>Reflect →</Text>
-              </Pressable>
-            </View>
-          </LinearGradient>
+                  <View style={styles.heroFooter}>
+                    <View style={styles.heroRef}>
+                      <Text style={styles.heroRefText}>
+                        {dailyAyah ? dailyAyah.reference : 'Al-Fatiha 1:2'}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={({ pressed }) => [styles.reflectBtn, pressed && { opacity: 0.8 }]}
+                      onPress={() => handleMode('ask')}
+                    >
+                      <Text style={styles.reflectText}>Reflect →</Text>
+                    </Pressable>
+                  </View>
+                </>
+              )}
+            </LinearGradient>
+          </View>
 
           {/* Mode Cards */}
           <View style={styles.sectionRow}>
@@ -189,18 +196,20 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.modeList}>
-            {MODES.map((mode, index) => (
+            {MODES.map((mode) => (
               <Pressable
                 key={mode.key}
                 onPress={() => handleMode(mode.key)}
                 style={({ pressed }) => [styles.modeCard, pressed && styles.modeCardPressed]}
               >
+                {/* 3D Glass Inner Wrapper */}
                 <LinearGradient
-                  colors={['rgba(255,255,255,0.92)', 'rgba(255,255,255,0.80)']}
+                  colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.75)']}
                   style={styles.modeCardInner}
                 >
                   <View style={[styles.modeIconWrap, { backgroundColor: `${mode.accentColor}18` }]}>
-                    <Ionicons name={mode.icon} size={22} color={mode.accentColor} />
+                    {/* ─── ADDED CUSTOM MODE ICONS HERE ─── */}
+                    <Image source={mode.image} style={styles.modeImage} />
                   </View>
                   <View style={styles.modeText}>
                     <Text style={styles.modeTitle}>{mode.title}</Text>
@@ -232,43 +241,68 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingBottom: 120 },
 
+  /* ─── ENHANCED HEADER ─── */
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: spacing.lg,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  headerTextWrap: {
+    flex: 1,
   },
   welcomeLabel: {
     ...typography.label,
-    color: colors.sage500,
+    color: colors.sage600,
     letterSpacing: 2.5,
     marginBottom: 4,
+    fontWeight: '700',
   },
   appTitle: {
     ...typography.displayLarge,
-    color: colors.textPrimary,
-    fontSize: 28,
+    color: colors.sage800,
+    fontSize: 30,
   },
   profileBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(255,255,255,0.70)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.85)',
+    width: 48, // Slightly larger to accommodate the beautiful profile art
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,1)',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadow.glass,
+    shadowColor: '#0A1E0C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: 'hidden', // Ensures the image respects the border radius
+  },
+  profileAvatar: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
 
-  // Hero card
-  heroCard: {
+  /* ─── 3D HERO CARD ─── */
+  heroWrapper: {
+    marginBottom: spacing.xl,
+    shadowColor: '#0A1E0C',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  heroCardInner: {
     borderRadius: radius.lg,
     padding: spacing.lg,
-    marginBottom: spacing.xl,
     overflow: 'hidden',
-    ...shadow.cardStrong,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255, 255, 255, 0.1)',
   },
   heroDot: {
     position: 'absolute',
@@ -368,7 +402,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Section
   sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -380,37 +413,51 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
 
-  // Mode cards
-  modeList: { gap: spacing.sm + 2, marginBottom: spacing.xl },
+  /* ─── 3D MODE CARDS ─── */
+  modeList: { gap: spacing.sm + 4, marginBottom: spacing.xl },
   modeCard: {
     borderRadius: radius.md,
-    overflow: 'hidden',
-    ...shadow.card,
+    shadowColor: '#0A1E0C',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6, 
   },
-  modeCardPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
+  modeCardPressed: { opacity: 0.95, transform: [{ scale: 0.98 }] },
   modeCardInner: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md + 2,
+    paddingVertical: spacing.md + 4,
     gap: spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.90)',
     borderRadius: radius.md,
+    borderTopWidth: 2,
+    borderTopColor: 'rgba(255, 255, 255, 1)',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255, 255, 255, 0.7)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(0, 0, 0, 0.05)',
   },
   modeIconWrap: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  modeImage: {
+    width: 32,
+    height: 32,
+    resizeMode: 'contain',
   },
   modeText: { flex: 1 },
   modeTitle: {
     ...typography.displaySmall,
     color: colors.textPrimary,
-    fontSize: 15,
-    marginBottom: 3,
+    fontSize: 16,
+    marginBottom: 2,
   },
   modeSub: {
     ...typography.bodySmall,
@@ -420,12 +467,11 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(168,204,168,0.20)',
+    backgroundColor: 'rgba(168,204,168,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Bottom ornament
   bottomOrnament: {
     flexDirection: 'row',
     alignItems: 'center',

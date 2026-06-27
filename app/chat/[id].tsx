@@ -1,49 +1,32 @@
-import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import GlassCard from '../../components/ui/GlassCard';
+
 import ChatBubble from '../../components/chat/ChatBubble';
 import ChatInput from '../../components/chat/ChatInput';
 import TypingIndicator from '../../components/chat/TypingIndicator';
-import { useChatStore } from '../../store/useChatStore';
-import { colors, typography, spacing, radius, shadow, gradients, blur as blurIntensity } from '../../lib/theme';
-
-// Spiritual crescent+star icon replacing the Gemini flower
-function SpiritualIcon({ size = 20 }: { size?: number }) {
-  return (
-    <View style={{ width: size + 4, height: size + 4, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        borderWidth: Math.max(2, size * 0.12),
-        borderColor: colors.gold,
-        position: 'absolute',
-      }} />
-      <View style={{
-        position: 'absolute',
-        width: size * 0.7,
-        height: size * 0.7,
-        borderRadius: size * 0.35,
-        backgroundColor: colors.sage700,
-        top: size * 0.05,
-        left: size * 0.24,
-      }} />
-      <Text style={{
-        position: 'absolute',
-        top: -2,
-        right: -2,
-        fontSize: size * 0.3,
-        color: colors.gold,
-        lineHeight: size * 0.36,
-      }}>✦</Text>
-    </View>
-  );
-}
+import { useChatStore, type Citation } from '../../store/useChatStore';
+import {
+  colors,
+  typography,
+  spacing,
+  radius,
+  shadow,
+  gradients,
+  blur as blurIntensity,
+} from '../../lib/theme';
 
 const MODE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   ask: 'book-outline',
@@ -51,74 +34,53 @@ const MODE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   dua: 'hand-left-outline',
 };
 
+const EMPTY_STATE_TEXT: Record<string, { title: string; body: string }> = {
+  ask: {
+    title: 'As-salamu alaykum!',
+    body: "I am here to help you explore the Qur'an. Ask me anything — from the meaning of a specific ayah to the stories of the prophets.",
+  },
+  comfort: {
+    title: 'Peace be upon you',
+    body: "Whatever you are going through, the Qur'an is a source of healing and comfort. Tell me how you are feeling right now.",
+  },
+  dua: {
+    title: 'Let us pray together',
+    body: "Tell me what you are seeking from Allah, and I will help you find the right words from the Qur'an and Sunnah.",
+  },
+};
+
 export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const listRef = useRef<FlatList>(null);
-  const [isTyping, setIsTyping] = useState(false);
 
   const conversation = useChatStore((s) => s.getConversation(id ?? ''));
   const sendMessage = useChatStore((s) => s.sendMessage);
-  const addAssistantMessage = useChatStore((s) => s.addAssistantMessage);
   const getModeMeta = useChatStore((s) => s.getModeMeta);
 
   const mode = conversation?.mode ?? 'ask';
   const meta = getModeMeta(mode);
 
+  // isLoading = there is a loading bubble in the messages list
+  const isLoading = conversation?.messages.some((m) => m.isLoading) ?? false;
+
+  // Scroll to bottom whenever messages change or loading state changes
   useEffect(() => {
     if (conversation?.messages?.length) {
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     }
-  }, [conversation?.messages?.length, isTyping]);
+  }, [conversation?.messages?.length, isLoading]);
 
   const handleSend = async (text: string) => {
-    if (!id || isTyping) return;
-    sendMessage(id, text);
-    setIsTyping(true);
-
-    try {
-      const history = (conversation?.messages ?? []).slice(-6).map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-
-      const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' +
-          process.env.EXPO_PUBLIC_GEMINI_API_KEY,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: meta.systemPrompt }] },
-            contents: [
-              ...history.map((m) => ({
-                role: m.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: m.content }],
-              })),
-              { role: 'user', parts: [{ text }] },
-            ],
-            generationConfig: { maxOutputTokens: 800, temperature: 0.7 },
-          }),
-        }
-      );
-
-      const data = await response.json();
-      const reply =
-        data?.candidates?.[0]?.content?.parts?.[0]?.text ??
-        'I apologize, I was unable to generate a response. Please try again.';
-      addAssistantMessage(id, reply);
-    } catch {
-      addAssistantMessage(id, 'Something went wrong. Please check your connection and try again.');
-    } finally {
-      setIsTyping(false);
-    }
+    if (!id || isLoading) return;
+    await sendMessage(id, text);
   };
 
   if (!conversation) {
     return (
       <LinearGradient colors={[...gradients.chatBg]} style={styles.flex}>
         <SafeAreaView style={[styles.flex, styles.notFound]}>
-          <SpiritualIcon size={40} />
+          <MaterialCommunityIcons name="star-crescent" size={48} color={colors.gold} />
           <Text style={styles.notFoundText}>Conversation not found</Text>
           <Pressable onPress={() => router.back()} style={styles.backLinkBtn}>
             <Text style={styles.backLink}>Go back</Text>
@@ -129,81 +91,130 @@ export default function ConversationScreen() {
   }
 
   return (
-    <LinearGradient colors={[...gradients.chatBg]} style={styles.flex}>
-      {/* Subtle dot pattern */}
-      <View style={styles.bgPattern} pointerEvents="none">
-        {[...Array(16)].map((_, i) => (
-          <View key={i} style={[styles.bgDot, {
-            top: `${(i % 4) * 25 + 5}%` as any,
-            left: `${Math.floor(i / 4) * 28 + 5}%` as any,
-          }]} />
-        ))}
-      </View>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
 
-      <SafeAreaView style={styles.flex} edges={['top']}>
-        {/* Header */}
-        <BlurView intensity={blurIntensity.light} tint="light" style={styles.headerBlur}>
-          <View style={styles.header}>
-            {/* Back button */}
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]}
-            >
-              <Ionicons name="chevron-back" size={22} color={colors.sage600} />
-            </Pressable>
-
-            {/* Mode icon */}
-            <LinearGradient
-              colors={[colors.sage700, colors.sage800]}
-              style={styles.headerIconWrap}
-            >
-              <Ionicons name={MODE_ICONS[mode] ?? 'book-outline'} size={18} color={colors.gold} />
-            </LinearGradient>
-
-            {/* Title */}
-            <View style={styles.headerText}>
-              <Text style={styles.headerTitle}>{meta.title}</Text>
-              <Text style={styles.headerSubtitle}>AI Scholar · Always cite sources</Text>
-            </View>
-
-            {/* Spiritual icon (replaces Gemini flower) */}
-            <View style={styles.spiritualIconWrap}>
-              <SpiritualIcon size={18} />
-            </View>
-          </View>
-        </BlurView>
-
-        {/* Messages */}
-        <FlatList
-          ref={listRef}
-          data={conversation.messages}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.messageList}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <ChatBubble
-              role={item.role}
-              content={item.content}
-              citations={item.citations}
+      <LinearGradient colors={[...gradients.chatBg]} style={styles.flex}>
+        {/* Background dot pattern */}
+        <View style={styles.bgPattern} pointerEvents="none">
+          {[...Array(16)].map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.bgDot,
+                {
+                  top: `${(i % 4) * 25 + 5}%` as `${number}%`,
+                  left: `${Math.floor(i / 4) * 28 + 5}%` as `${number}%`,
+                },
+              ]}
             />
-          )}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIconWrap}>
-                <SpiritualIcon size={32} />
-              </View>
-              <Text style={styles.emptyTitle}>As-salamu alaykum!</Text>
-              <Text style={styles.emptyBody}>
-                I'm here to help you explore the Qur'an. Ask me anything — from the meaning of a specific ayah to the stories of the prophets. What would you like to know?
-              </Text>
-            </View>
-          }
-          ListFooterComponent={isTyping ? <TypingIndicator /> : null}
-        />
+          ))}
+        </View>
 
-        <ChatInput onSend={handleSend} disabled={isTyping} />
-      </SafeAreaView>
-    </LinearGradient>
+        <SafeAreaView style={styles.flex} edges={['top']}>
+          {/* ── Header ─────────────────────────────────────────────────── */}
+          <BlurView
+            intensity={blurIntensity.medium}
+            tint="light"
+            style={styles.headerBlur}
+          >
+            <View style={styles.header}>
+              <Pressable
+                onPress={() => router.back()}
+                style={({ pressed }) => [
+                  styles.backButton,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Ionicons name="chevron-back" size={22} color={colors.sage700} />
+              </Pressable>
+
+              <LinearGradient
+                colors={[colors.sage700, colors.sage800]}
+                style={styles.headerIconWrap}
+              >
+                <Ionicons
+                  name={MODE_ICONS[mode] ?? 'book-outline'}
+                  size={18}
+                  color={colors.gold}
+                />
+              </LinearGradient>
+
+              <View style={styles.headerText}>
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                  {meta.title}
+                </Text>
+                <Text style={styles.headerSubtitle}>
+                  AI Scholar · Always cite sources
+                </Text>
+              </View>
+
+              <View style={styles.spiritualIconWrap}>
+                <MaterialCommunityIcons
+                  name="star-crescent"
+                  size={20}
+                  color={colors.gold}
+                />
+              </View>
+            </View>
+          </BlurView>
+
+          {/* ── Messages + Input ────────────────────────────────────────── */}
+          <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+          >
+            <FlatList
+              ref={listRef}
+              data={conversation.messages}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.messageList}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => {
+                if (item.isLoading) {
+                  // Render TypingIndicator inside the assistant bubble position
+                  return <TypingIndicator />;
+                }
+
+                return (
+                  <ChatBubble
+                    role={item.role}
+                    content={item.content}
+                    // Pass the full Citation objects — ChatBubble uses surah + ayah
+                    citations={item.citations?.map((c: Citation) => ({
+                      surah: c.surah,
+                      ayah: c.ayah,
+                    }))}
+                  />
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.emptyStateContainer}>
+                  <View style={styles.emptyStateCard}>
+                    <View style={styles.emptyIconWrap}>
+                      <MaterialCommunityIcons
+                        name="star-crescent"
+                        size={38}
+                        color={colors.gold}
+                      />
+                    </View>
+                    <Text style={styles.emptyTitle}>
+                      {EMPTY_STATE_TEXT[mode]?.title ?? 'As-salamu alaykum!'}
+                    </Text>
+                    <Text style={styles.emptyBody}>
+                      {EMPTY_STATE_TEXT[mode]?.body ?? 'How can I help you today?'}
+                    </Text>
+                  </View>
+                </View>
+              }
+            />
+
+            <ChatInput onSend={handleSend} disabled={isLoading} />
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </LinearGradient>
+    </>
   );
 }
 
@@ -217,16 +228,17 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 1.5,
     backgroundColor: colors.sage400,
-    opacity: 0.12,
+    opacity: 0.15,
   },
 
   headerBlur: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(168,204,168,0.25)',
+    borderBottomColor: 'rgba(168,204,168,0.4)',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
     gap: spacing.sm,
@@ -235,9 +247,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: 'rgba(255,255,255,0.8)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.90)',
+    borderColor: 'rgba(255,255,255,0.9)',
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow.glass,
@@ -245,66 +257,79 @@ const styles = StyleSheet.create({
   headerIconWrap: {
     width: 40,
     height: 40,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow.goldGlowSoft,
   },
   headerText: { flex: 1 },
   headerTitle: {
-    ...typography.displaySmall,
-    fontSize: 15,
+    // Fixed: use DMSerifDisplay, not Fraunces-SemiBold (not in font stack)
+    fontFamily: 'DMSerifDisplay-Regular',
+    fontSize: 16,
     color: colors.textPrimary,
-    fontFamily: 'Fraunces-SemiBold',
   },
   headerSubtitle: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: colors.sage600,
     fontSize: 11,
-    marginTop: 1,
+    marginTop: 2,
   },
   spiritualIconWrap: {
     width: 36,
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+    borderRadius: 18,
   },
 
   messageList: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.xl,
     flexGrow: 1,
   },
 
-  // Empty state (greeting)
-  emptyState: {
+  emptyStateContainer: {
     flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: spacing.xxl + spacing.xl,
-    paddingHorizontal: spacing.xl,
-    gap: spacing.md,
+    paddingTop: spacing.xxl,
+  },
+  emptyStateCard: {
+    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.8)',
+    ...shadow.card,
   },
   emptyIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: colors.sage700,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+    borderWidth: 2,
+    borderColor: 'rgba(212,175,55,0.3)',
     ...shadow.goldGlowSoft,
   },
   emptyTitle: {
     ...typography.displayMedium,
-    color: colors.textPrimary,
+    color: colors.sage800,
     textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   emptyBody: {
     ...typography.bodyMedium,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 24,
   },
 
   notFound: {

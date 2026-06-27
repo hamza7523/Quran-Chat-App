@@ -1,38 +1,23 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { View, Text, StyleSheet, Image, ScrollView, Pressable, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import ScreenContainer from '../../components/ui/ScreenContainer';
-import ScreenHeader from '../../components/ui/ScreenHeader';
-import SectionHeader from '../../components/ui/SectionHeader';
-import GlassCard from '../../components/ui/GlassCard';
-import { ListRow } from '../../components/ui/ListRow';
-import { useChatStore } from '../../store/useChatStore';
-import { colors, typography, spacing, radius, gradients, surfaces, shadow } from '../../lib/theme';
-
-const ACHIEVEMENTS = [
-  { icon: 'book-outline' as const, label: 'First Chat', unlocked: true },
-  { icon: 'flame-outline' as const, label: '3-Day Streak', unlocked: false },
-  { icon: 'star-outline' as const, label: '10 Verses', unlocked: false },
-  { icon: 'heart-outline' as const, label: 'Found Comfort', unlocked: false },
-];
-
-function StatCard({ value, label, index }: { value: number; label: string; index: number }) {
-  return (
-    <Animated.View
-      entering={FadeInDown.delay(200 + index * 60).duration(300).springify()}
-      style={styles.statItem}
-    >
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </Animated.View>
-  );
-}
+import ScreenContainer from '@/components/ui/ScreenContainer';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import SectionHeader from '@/components/ui/SectionHeader';
+import { ListRow } from '@/components/ui/ListRow';
+import { useChatStore } from '@/store/useChatStore';
+import { useAuthStore } from '@/store/useAuthStore';
+import { colors, typography, spacing, radius } from '@/lib/theme';
 
 export default function ProfileTab() {
   const router = useRouter();
   const conversations = useChatStore((s) => s.conversations);
+  const { user, signOut, isLoading } = useAuthStore();
+
+  // Prefer auth user's name, fall back to Guest
+  const displayName = user?.user_metadata?.name ?? user?.email?.split('@')[0] ?? 'Guest';
+  const displayEmail = user?.email ?? '';
 
   const stats = {
     conversations: conversations.length,
@@ -40,378 +25,303 @@ export default function ProfileTab() {
     daysActive: Math.max(1, Math.ceil(conversations.length / 2)),
   };
 
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: () => signOut(),
+        },
+      ]
+    );
+  };
+
   return (
-    <ScreenContainer>
-      <ScreenHeader
-        title="Profile"
-        actionIcon="settings-outline"
-        onAction={() => {}}
-      />
+    <ScreenContainer scroll={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
+        <ScreenHeader
+          title="Profile"
+          actionIcon="settings-outline"
+          onAction={() => {}}
+        />
 
-      {/* Profile Hero */}
-      <Animated.View entering={FadeInDown.duration(350).springify()}>
-        <LinearGradient
-          colors={[colors.sage700, colors.sage800, '#091A0B']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.profileCard, shadow.cardStrong]}
-        >
-          {/* Decorative pattern */}
-          {[...Array(8)].map((_, i) => (
-            <View key={i} style={[styles.cardDot, {
-              top: `${20 + (i % 3) * 30}%` as any,
-              right: `${(i / 8) * 60}%` as any,
-              opacity: 0.06 + (i % 2) * 0.03,
-            }]} />
-          ))}
+        {/* ── 3D Profile Hero Card ──────────────────────────────────────── */}
+        <View style={styles.cardWrapper}>
+          <LinearGradient
+            colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.6)']}
+            style={styles.profileCard}
+          >
+            <View style={styles.heroRow}>
+              {/* Avatar */}
+              <View style={styles.avatarWrap}>
+                <Image
+                  source={require('../../assets/images/arab-man.png')}
+                  style={styles.avatarImage}
+                />
+              </View>
 
-          <View style={styles.heroRow}>
-            {/* Avatar */}
-            <View style={styles.avatarWrap}>
-              <LinearGradient
-                colors={['rgba(201,168,76,0.25)', 'rgba(201,168,76,0.10)']}
-                style={styles.avatar}
-              >
-                <Ionicons name="person" size={30} color={colors.gold} />
-              </LinearGradient>
-              <View style={styles.onlineDot} />
-            </View>
-
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>Guest User</Text>
-              <Text style={styles.userIntent}>Muslim · Seeker of Knowledge</Text>
-              <View style={styles.badgeRow}>
-                {[1,2,3,4,5].map((s) => (
-                  <Ionicons key={s} name={s <= 4 ? "star" : "star-outline"} size={12} color={colors.gold} />
-                ))}
-                <Text style={styles.learnerBadge}>Dedicated Learner</Text>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName} numberOfLines={1}>
+                  {displayName}
+                </Text>
+                {displayEmail ? (
+                  <Text style={styles.userEmail} numberOfLines={1}>
+                    {displayEmail}
+                  </Text>
+                ) : null}
+                <Text style={styles.userIntent}>Muslim · Exploring</Text>
+                <View style={styles.badgeRow}>
+                  <Ionicons name="star" size={12} color={colors.gold} />
+                  <Text style={styles.learnerBadge}>Dedicated Learner</Text>
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* Stats */}
-          <View style={styles.statsRow}>
-            <StatCard value={stats.conversations} label="Conversations" index={0} />
-            <View style={styles.statDivider} />
-            <StatCard value={stats.versesExplored} label="Verses Explored" index={1} />
-            <View style={styles.statDivider} />
-            <StatCard value={stats.daysActive} label="Days Active" index={2} />
-          </View>
+            {/* Stats Row */}
+            <View style={styles.statsRow}>
+              {[
+                { value: stats.conversations, label: 'Chats' },
+                { value: stats.versesExplored, label: 'Verses' },
+                { value: stats.daysActive, label: 'Active Days' },
+              ].map((stat, index) => (
+                <View
+                  key={stat.label}
+                  style={[styles.statItem, index < 2 && styles.statItemBorder]}
+                >
+                  <Text style={styles.statValue}>{stat.value}</Text>
+                  <Text style={styles.statLabel}>{stat.label}</Text>
+                </View>
+              ))}
+            </View>
+          </LinearGradient>
+        </View>
 
-          {/* CTA */}
-          <View style={styles.ctaRow}>
-            <Text style={styles.ctaText}>Save your conversations</Text>
-            <Pressable style={styles.signInBtn}>
-              <Text style={styles.signInText}>Sign In / Register</Text>
-            </Pressable>
-          </View>
-        </LinearGradient>
-      </Animated.View>
+        {/* ── Past Conversations ────────────────────────────────────────── */}
+        <SectionHeader
+          title="Past Conversations"
+          meta={`${conversations.length} ${conversations.length === 1 ? 'chat' : 'chats'}`}
+        />
 
-      {/* Save prompt card */}
-      <Animated.View entering={FadeInDown.delay(150).duration(300).springify()}>
-        <LinearGradient
-          colors={['rgba(255,248,225,0.95)', 'rgba(255,243,200,0.85)']}
-          style={[styles.ctaCard, shadow.glass]}
+        <View style={styles.cardWrapper}>
+          <View style={[styles.profileCard, { padding: 0 }]}>
+            {conversations.length === 0 ? (
+              <View style={styles.emptyConversations}>
+                <View style={styles.emptyIconWrap}>
+                  <Ionicons name="chatbubbles-outline" size={28} color={colors.textTertiary} />
+                </View>
+                <Text style={styles.emptyConversationsText}>No conversations yet</Text>
+              </View>
+            ) : (
+              conversations.map((conv, index) => (
+                <ListRow
+                  key={conv.id}
+                  title={conv.title}
+                  meta={conv.updatedAt}
+                  icon="chatbubble-outline"
+                  onPress={() => router.push(`/chat/${conv.id}` as never)}
+                  bordered={index < conversations.length - 1}
+                />
+              ))
+            )}
+          </View>
+        </View>
+
+        {/* ── Sign Out ──────────────────────────────────────────────────── */}
+        <Pressable
+          onPress={handleSignOut}
+          disabled={isLoading}
+          style={({ pressed }) => [
+            styles.signOutBtn,
+            pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+          ]}
         >
-          <View style={styles.ctaCardInner}>
-            <View style={styles.ctaCardIcon}>
-              <Ionicons name="cloud-upload-outline" size={20} color={colors.goldDeep} />
-            </View>
-            <View style={styles.ctaCardText}>
-              <Text style={styles.ctaCardTitle}>Save your conversations</Text>
-              <Text style={styles.ctaCardBody}>
-                Sign in to sync your history across devices and never lose a conversation.
-              </Text>
-            </View>
-          </View>
-          <Pressable style={styles.goldBtn}>
-            <LinearGradient
-              colors={[colors.gold, colors.goldDeep]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.goldBtnGradient}
-            >
-              <Text style={styles.goldBtnText}>Sign In / Register</Text>
-            </LinearGradient>
-          </Pressable>
-        </LinearGradient>
-      </Animated.View>
-
-      {/* Achievements */}
-      <SectionHeader title="Achievements" meta={`${ACHIEVEMENTS.filter(a => a.unlocked).length}/${ACHIEVEMENTS.length}`} />
-      <View style={styles.achievementsRow}>
-        {ACHIEVEMENTS.map((a, i) => (
-          <Animated.View
-            key={a.label}
-            entering={FadeInDown.delay(300 + i * 50).duration(280).springify()}
-            style={[styles.achievementItem, !a.unlocked && styles.achievementLocked]}
-          >
-            <LinearGradient
-              colors={a.unlocked
-                ? [colors.sage700, colors.sage800]
-                : ['rgba(168,204,168,0.30)', 'rgba(148,184,148,0.20)']
-              }
-              style={styles.achievementIcon}
-            >
-              <Ionicons
-                name={a.icon}
-                size={20}
-                color={a.unlocked ? colors.gold : colors.textTertiary}
-              />
-            </LinearGradient>
-            <Text style={[styles.achievementLabel, !a.unlocked && styles.achievementLabelLocked]}>
-              {a.label}
+          <View style={styles.signOutInner}>
+            <Ionicons name="log-out-outline" size={18} color={colors.error} />
+            <Text style={styles.signOutText}>
+              {isLoading ? 'Signing out…' : 'Sign Out'}
             </Text>
-          </Animated.View>
-        ))}
-      </View>
-
-      {/* Past Conversations */}
-      <SectionHeader
-        title="Past Conversations"
-        meta={`${conversations.length} ${conversations.length === 1 ? 'chat' : 'chats'}`}
-      />
-
-      <GlassCard variant="sage">
-        {conversations.length === 0 ? (
-          <View style={styles.emptyConversations}>
-            <Ionicons name="chatbubbles-outline" size={22} color={colors.textTertiary} />
-            <Text style={styles.emptyConversationsText}>No conversations yet</Text>
           </View>
-        ) : (
-          conversations.map((conv, index) => (
-            <ListRow
-              key={conv.id}
-              title={conv.title}
-              meta={conv.updatedAt}
-              icon="chatbubble-outline"
-              onPress={() => router.push(`/chat/${conv.id}`)}
-              bordered={index < conversations.length - 1}
-            />
-          ))
-        )}
-      </GlassCard>
+        </Pressable>
+
+      </ScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  // Profile card
-  profileCard: {
-    borderRadius: radius.lg,
+  // ── Card shell — same 3D bevel as tab bar ──
+  cardWrapper: {
     marginBottom: spacing.lg,
+    shadowColor: '#0A1E0C',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 8,
+  },
+  profileCard: {
+    borderRadius: radius.xl,
     overflow: 'hidden',
-    ...shadow.cardStrong,
+    borderTopWidth: 2,
+    borderTopColor: '#FFF',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255,255,255,0.7)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
-  cardDot: {
-    position: 'absolute',
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.gold,
-  },
+
+  // ── Hero row ──
   heroRow: {
     flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  avatarWrap: { position: 'relative' },
-  avatar: {
-    width: 66,
-    height: 66,
-    borderRadius: radius.md,
+    gap: spacing.lg,
+    padding: spacing.xl,
+    paddingBottom: spacing.md,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(201,168,76,0.40)',
   },
-  onlineDot: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#4CAF50',
-    borderWidth: 2,
-    borderColor: colors.sage800,
+  avatarWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: '#FFF',
+    padding: 2,
+    shadowColor: colors.gold,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  userInfo: { flex: 1, justifyContent: 'center', gap: 4 },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 36,
+    resizeMode: 'cover',
+  },
+  userInfo: { flex: 1, justifyContent: 'center' },
   userName: {
-    fontFamily: 'Fraunces-SemiBold',
-    fontSize: 20,
-    color: colors.textOnDark,
-    lineHeight: 26,
+    ...typography.displayMedium,
+    color: colors.textPrimary,
+    marginBottom: 2,
+    fontSize: 22,
+  },
+  userEmail: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+    marginBottom: 2,
+    fontSize: 11,
   },
   userIntent: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 13,
-    color: 'rgba(244,248,244,0.70)',
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    marginTop: 2,
+    gap: 4,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(201,168,76,0.12)',
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm + 4,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(201,168,76,0.3)',
   },
   learnerBadge: {
-    fontFamily: 'Inter-Medium',
+    ...typography.bodySmall,
     fontSize: 11,
-    color: colors.goldMuted,
-    marginLeft: 4,
+    color: colors.goldDeep,
+    fontFamily: 'DMSans-Medium',
   },
 
-  // Stats
+  // ── Stats ──
   statsRow: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.10)',
-    paddingVertical: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
+    borderTopColor: 'rgba(168,204,168,0.2)',
+    paddingVertical: spacing.lg,
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
-  statItem: { flex: 1, alignItems: 'center', gap: 3 },
-  statDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    alignSelf: 'stretch',
+  statItem: { flex: 1, alignItems: 'center' },
+  statItemBorder: {
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(168,204,168,0.2)',
   },
   statValue: {
-    fontFamily: 'Fraunces-SemiBold',
-    fontSize: 26,
-    color: colors.textOnDark,
-    lineHeight: 32,
+    ...typography.displayMedium,
+    fontSize: 24,
+    color: colors.sage800,
   },
   statLabel: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 10,
-    color: 'rgba(244,248,244,0.55)',
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+    marginTop: 4,
     textAlign: 'center',
-    letterSpacing: 0.3,
+    fontFamily: 'DMSans-SemiBold',
   },
 
-  // CTA inside card
-  ctaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-  },
-  ctaText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 12,
-    color: 'rgba(244,248,244,0.55)',
-  },
-  signInBtn: {
-    backgroundColor: 'rgba(201,168,76,0.20)',
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.35)',
-  },
-  signInText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 12,
-    color: colors.gold,
-  },
-
-  // CTA card below
-  ctaCard: {
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    gap: spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.25)',
-    ...shadow.glass,
-  },
-  ctaCardInner: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
-  ctaCardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.sm,
-    backgroundColor: 'rgba(201,168,76,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaCardText: { flex: 1, gap: 4 },
-  ctaCardTitle: {
-    fontFamily: 'Fraunces-SemiBold',
-    fontSize: 15,
-    color: colors.goldDeep,
-  },
-  ctaCardBody: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 12,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
-  goldBtn: { borderRadius: radius.full, overflow: 'hidden' },
-  goldBtnGradient: {
-    paddingVertical: spacing.sm + 2,
-    alignItems: 'center',
-    borderRadius: radius.full,
-  },
-  goldBtnText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
-  },
-
-  // Achievements
-  achievementsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
-    flexWrap: 'wrap',
-  },
-  achievementItem: {
-    flex: 1,
-    minWidth: 70,
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: 'rgba(255,255,255,0.65)',
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.85)',
-    ...shadow.glass,
-  },
-  achievementLocked: { opacity: 0.55 },
-  achievementIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  achievementLabel: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 10,
-    color: colors.textPrimary,
-    textAlign: 'center',
-    lineHeight: 14,
-  },
-  achievementLabelLocked: { color: colors.textTertiary },
-
-  // Conversations
+  // ── Empty conversations ──
   emptyConversations: {
-    padding: spacing.xl,
+    padding: spacing.xxl,
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  emptyIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
   },
   emptyConversationsText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 13,
+    ...typography.bodyMedium,
     color: colors.textSecondary,
     textAlign: 'center',
+    fontFamily: 'DMSans-SemiBold',
+  },
+
+  // ── Sign out ──
+  signOutBtn: {
+    marginBottom: spacing.lg,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    // Same bevel shell as profileCard
+    borderTopWidth: 2,
+    borderTopColor: '#FFF',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255,255,255,0.7)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+    shadowColor: '#0A1E0C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  signOutInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: 'rgba(192,57,43,0.07)',
+    paddingVertical: spacing.md + 4,
+    borderWidth: 1,
+    borderColor: 'rgba(192,57,43,0.18)',
+    borderRadius: radius.lg,
+  },
+  signOutText: {
+    ...typography.button,
+    color: colors.error,
   },
 });

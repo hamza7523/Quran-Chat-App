@@ -1,8 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing, radius, shadow } from '../../lib/theme';
-import AyahCitationChip from './AyahCitationChip';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { colors, typography, spacing, radius } from '../../lib/theme';
 
 type ChatBubbleProps = {
   role: 'user' | 'assistant';
@@ -10,97 +8,109 @@ type ChatBubbleProps = {
   citations?: { surah: string; ayah: number }[];
 };
 
-export default function ChatBubble({ role, content, citations }: ChatBubbleProps) {
+export default function ChatBubble({ role, content }: ChatBubbleProps) {
   const isUser = role === 'user';
 
-  if (isUser) {
-    return (
-      <View style={styles.userRow}>
-        <LinearGradient
-          colors={[colors.gold, colors.goldDeep]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.userBubble, shadow.goldGlowSoft]}
-        >
-          <Text style={styles.userText}>{content}</Text>
-        </LinearGradient>
-      </View>
-    );
-  }
+  // A much safer, bulletproof parser that simply splits by ANY brackets
+  const renderContent = () => {
+    if (!content) return null;
+    
+    // Splits by anything inside brackets without complex regex rules that might crash
+    const parts = content.split(/(\[[^\]]+\])/g);
+
+    return parts.map((part, index) => {
+      // If the part is inside brackets, highlight it gold
+      if (part.startsWith('[') && part.endsWith(']')) {
+        return (
+          <Text key={index} style={styles.citationText}>
+            {part}
+          </Text>
+        );
+      }
+      // Otherwise, render regular text
+      return <Text key={index}>{part}</Text>;
+    });
+  };
 
   return (
-    <View style={styles.aiRow}>
-      <View style={styles.avatar}>
-        <Ionicons name="sparkles" size={14} color={colors.gold} />
-      </View>
-      <View style={[styles.aiBubble, shadow.card]}>
-        <Text style={styles.aiText}>{content}</Text>
-        {citations && citations.length > 0 && (
-          <View style={styles.citations}>
-            {citations.map((c, i) => (
-              <AyahCitationChip key={i} surah={c.surah} ayah={c.ayah} />
-            ))}
-          </View>
-        )}
+    <View style={[styles.container, isUser ? styles.userContainer : styles.aiContainer]}>
+      {!isUser && (
+        <View style={styles.aiAvatar}>
+          <MaterialCommunityIcons name="star-four-points" size={16} color={colors.gold} />
+        </View>
+      )}
+      
+      <View style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble]}>
+        {/* ADDED fontFamily: undefined TO PREVENT ARABIC CHARACTER CRASHES */}
+        <Text style={[styles.text, isUser ? styles.userText : styles.aiText]}>
+          {renderContent()}
+        </Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  userRow: {
+  container: {
     flexDirection: 'row',
+    marginBottom: spacing.lg,
+    alignItems: 'flex-end',
+  },
+  userContainer: {
     justifyContent: 'flex-end',
-    marginBottom: spacing.md,
-    paddingLeft: spacing.xxl,
   },
-  userBubble: {
-    borderRadius: radius.lg,
-    borderBottomRightRadius: radius.sm,
-    paddingHorizontal: spacing.md + 2,
-    paddingVertical: spacing.md,
-    maxWidth: '85%',
+  aiContainer: {
+    justifyContent: 'flex-start',
   },
-  userText: {
-    ...typography.bodyMedium,
-    color: '#FFFFFF',
-    lineHeight: 22,
-  },
-  aiRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-    paddingRight: spacing.xl,
-    gap: spacing.sm,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.sage700,
+  aiAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.sage800,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
+    marginRight: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  bubble: {
+    maxWidth: '82%',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+  },
+  userBubble: {
+    backgroundColor: '#C59A45', 
+    borderBottomRightRadius: 4,
   },
   aiBubble: {
-    flex: 1,
-    backgroundColor: colors.bubbleAI,
-    borderRadius: radius.lg,
-    borderBottomLeftRadius: radius.sm,
+    backgroundColor: '#FFFFFF',
+    borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: colors.borderLight,
-    paddingHorizontal: spacing.md + 2,
-    paddingVertical: spacing.md,
+    borderColor: 'rgba(168,204,168,0.3)',
+    shadowColor: '#0A1E0C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  text: {
+    ...typography.bodyMedium,
+    fontFamily: undefined, // <--- CRITICAL FIX: Forces system font to handle all foreign glyphs safely
+    lineHeight: 24,
+    fontSize: 15,
+  },
+  userText: {
+    color: '#FFFFFF',
   },
   aiText: {
-    ...typography.bodyMedium,
-    color: colors.textPrimary,
-    lineHeight: 22,
+    color: colors.sage800,
   },
-  citations: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
+  citationText: {
+    color: '#B58D3D',
+    fontWeight: 'bold',
   },
 });
