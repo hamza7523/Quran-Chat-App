@@ -108,8 +108,8 @@ export default function RootLayout() {
   return (
     <AuthGuard>
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="auth"      options={{ animation: 'fade', gestureEnabled: false }} />
-        <Stack.Screen name="(tabs)"    options={{ animation: 'fade' }} />
+        <Stack.Screen name="auth"      options={{ animation: 'none', gestureEnabled: false }} />
+        <Stack.Screen name="(tabs)"    options={{ animation: 'none' }} />
         <Stack.Screen name="chat/[id]" options={{ animation: 'slide_from_right' }} />
       </Stack>
       <StatusBar style="dark" />

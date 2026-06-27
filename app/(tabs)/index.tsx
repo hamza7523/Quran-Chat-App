@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useChatStore } from '../../store/useChatStore';
+import { useAuthStore } from '../../store/useAuthStore'; // <-- 1. Import Auth Store
 import { fetchDailyAyah, DailyAyah } from '../../lib/quranApi';
 import { colors, typography, spacing, radius, shadow, gradients } from '../../lib/theme';
 import type { ChatMode } from '../../store/useChatStore';
@@ -93,8 +94,24 @@ export default function HomeScreen() {
   // Dynamic Welcome Logic
   const conversations = useChatStore((s) => s.conversations);
   const isNewUser = !conversations || conversations.length === 0;
-  const greetingText = isNewUser ? 'WELCOME' : 'WELCOME BACK';
-  
+  // Get the user's name from auth store
+// Get the user's name from auth store
+const user = useAuthStore((s) => s.user);
+const firstName =
+  user?.user_metadata?.name?.split(' ')[0] ||
+  user?.email?.split('@')[0];
+
+// Time-of-day greeting
+const getTimeGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good Morning';
+  if (hour < 17) return 'Good Afternoon';
+  return 'Good Evening';
+};
+
+const greetingText = isNewUser
+  ? 'WELCOME'
+  : `${getTimeGreeting().toUpperCase()}${firstName ? `, ${firstName.toUpperCase()}` : ''}`;
   const [dailyAyah, setDailyAyah] = useState<DailyAyah | null>(null);
   const [loadingAyah, setLoadingAyah] = useState(true);
 
@@ -121,6 +138,9 @@ export default function HomeScreen() {
             <View style={styles.headerTextWrap}>
               <Text style={styles.welcomeLabel}>{greetingText}</Text>
               <Text style={styles.appTitle}>Quran Chat</Text>
+              <Text style={styles.appSubtitle}>Reflect, ask, and find peace</Text>
+
+              
             </View>
             <Pressable style={styles.profileBtn} onPress={() => router.push('/profile')}>
               {/* ─── ADDED MALE PROFILE ICON HERE ─── */}
@@ -264,6 +284,11 @@ const styles = StyleSheet.create({
     color: colors.sage800,
     fontSize: 30,
   },
+  appSubtitle: {
+  ...typography.bodySmall,
+  color: colors.sage600,
+  marginTop: 2,
+},
   profileBtn: {
     width: 48, // Slightly larger to accommodate the beautiful profile art
     height: 48,
